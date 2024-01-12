@@ -41,12 +41,7 @@ namespace Brickcell {
             this.matrixAddress = HT16K33_CONSTANTS.DEFAULT_ADDRESS;
         }
 
-        //private static sendCommand(command: HT16K33_COMMANDS): void {
-        //    pins.i2cWriteNumber(this.matrixAddress, 0, NumberFormat.Int8LE, false);
-        //    pins.i2cWriteNumber(this.matrixAddress, command, NumberFormat.Int8LE, false);
-        //}
-
-        public sendCommand(command: HT16K33_COMMANDS): void {
+        private sendCommand(command: HT16K33_COMMANDS): void {
             pins.i2cWriteNumber(this.matrixAddress, 0, NumberFormat.Int8LE, false);
             pins.i2cWriteNumber(this.matrixAddress, command, NumberFormat.Int8LE, false);
         }
@@ -93,14 +88,18 @@ namespace Brickcell {
             return formattedBitmap;
         }
 
-        //% blockId="HT16K33_RENDER_BITMAP" block="render bitmap %bitmap"
+        //% blockId="HT16K33_RENDER_BITMAP"
+        //% block="%ht16k33 render bitmap %bitmap"
+        //% subcategory="dotmatrix_ht16k33"
         public render(bitmap: number[]): void {
             const formattedBitmap = this.formatBitmap(this.rotateMatrix(bitmap, HT16K33_ROTATION_DIRECTION.DEGREES_180));
             const buff = pins.createBufferFromArray(formattedBitmap);
             pins.i2cWriteBuffer(this.matrixAddress, buff, false);
         }
 
-        private initializeDisplay(): void {
+        public initializeDisplay(addr: number): void {
+            this.matrixAddress = addr;
+
             /** 
              * Required to initialize I2C 
              * Issue: https://github.com/lancaster-university/codal-samd/issues/13
@@ -113,20 +112,18 @@ namespace Brickcell {
             this.setBrightness(HT16K33_CONSTANTS.MAX_BRIGHTNESS);
         }
 
-        //% blockId="HT16K33_SET_ADDRESS" block="set address %address"
-        public setAddress(address: number): void {
-            this.matrixAddress = address;
-            this.initializeDisplay();
-        }
-
-        //% blockId="HT16K33_SET_BRIGHTNESS" block="set brightness %brightness"
+        //% blockId="HT16K33_SET_BRIGHTNESS"
+        //% block="%ht16k33 set brightness %brightness"
         //% brightness.min=0 brightness.max=15
+        //% subcategory="dotmatrix_ht16k33"
         public setBrightness(brightness: number): void {
             this.sendCommand(HT16K33_COMMANDS.SET_BRIGHTNESS | (brightness & HT16K33_CONSTANTS.MAX_BRIGHTNESS));
         }
 
-        //% blockId="HT16K33_SET_BLINK_RATE" block="set blink rate %rate"
+        //% blockId="HT16K33_SET_BLINK_RATE"
+        //% block="%ht16k33 set blink rate %rate"
         //% rate.min=0 rate.max=3
+        //% subcategory="dotmatrix_ht16k33"
         public setBlinkRate(rate: number): void {
             this.sendCommand(HT16K33_COMMANDS.TURN_DISPLAY_ON | ((rate & HT16K33_CONSTANTS.MAX_BLINK_RATE) << 1));
         }
@@ -135,9 +132,12 @@ namespace Brickcell {
     /**
      * Create a HT16K33 object.
      */
-    //% blockId="HT16K33_create" block="Create Dot Matrix Display"
+    //% blockId="HT16K33_create"
+    //% block="Create Dot Matrix Display at I2C addr %addr"
     //% subcategory="dotmatrix_ht16k33"
-    export function create(): HT16K33 {
+    export function create(addr: number): HT16K33 {
+        let ht16k33 = new HT16K33();
+        ht16k33.initializeDisplay(addr);
         return new HT16K33();
     }
 }
