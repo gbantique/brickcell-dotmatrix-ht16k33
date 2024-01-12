@@ -2,116 +2,142 @@
  * makecode HT16K33 led backpack Package
  */
 
-enum HT16K33_I2C_ADDRESSES {
-    //% block="0x70 (Default)"
-    ADD_0x70 = 0x70,
-    //% block="0x71"
-    ADD_0x71 = 0x71,
-    //% block="0x72"
-    ADD_0x72 = 0x72,
-    //% block="0x73"
-    ADD_0x73 = 0x73,
-    //% block="0x74"
-    ADD_0x74 = 0x74,
-    //% block="0x75"
-    ADD_0x75 = 0x75,
-    //% block="0x76"
-    ADD_0x76 = 0x76,
-    //% block="0x77"
-    ADD_0x77 = 0x77,
-}
-
-enum HT16K33_COMMANDS {
-    TURN_OSCILLATOR_ON = 0x21,
-    TURN_DISPLAY_ON = 0x81,
-    SET_BRIGHTNESS = 0xE0
-}
-
-enum HT16K33_CONSTANTS {
-    DEFAULT_ADDRESS = HT16K33_I2C_ADDRESSES.ADD_0x70,
-    MAX_BRIGHTNESS = 15,
-    MAX_BLINK_RATE = 3
-}
-
-/**
- * HT16K33 block
- */
 //% weight=100 color=#00a7e9 icon="\uf26c" block="HT16K33"
-namespace ht16k33 {
-    let matrixAddress = 0;
-
-    function sendCommand(command: HT16K33_COMMANDS) {
-        pins.i2cWriteNumber(
-            matrixAddress,
-            0,
-            NumberFormat.Int8LE,
-            false
-
-        )
-        pins.i2cWriteNumber(
-            matrixAddress,
-            command,
-            NumberFormat.Int8LE,
-            false
-        )
+namespace Brickcell {
+    enum HT16K33_I2C_ADDRESSES {
+        ADDR_0x70 = 0x70,
+        ADDR_0x71 = 0x71,
+        ADDR_0x72 = 0x72,
+        ADDR_0x73 = 0x73,
+        ADDR_0x74 = 0x74,
+        ADDR_0x75 = 0x75,
+        ADDR_0x76 = 0x76,
+        ADDR_0x77 = 0x77,
     }
 
-    //% blockId="HT16K33_RENDER_BITMAP" block="render bitmap %bitmap"
-    export function render(bitmap: number[]) {
-        const formattedBitmap = formatBimap(bitmap)
-        const buff = pins.createBufferFromArray(formattedBitmap);
-        pins.i2cWriteBuffer(matrixAddress, buff, false);
+    enum HT16K33_COMMANDS {
+        TURN_OSCILLATOR_ON = 0x21,
+        TURN_DISPLAY_ON = 0x81,
+        SET_BRIGHTNESS = 0xE0
     }
 
-    function rotate(value: number) {
-        return (value >> 1) | (value << 7);
+    enum HT16K33_CONSTANTS {
+        DEFAULT_ADDRESS = HT16K33_I2C_ADDRESSES.ADDR_0x70,
+        MAX_BRIGHTNESS = 15,
+        MAX_BLINK_RATE = 3
     }
 
-    function formatBimap(bitmap: Array<number>) {
-        const formattedBitmap: Array<number> = [0];
+    enum HT16K33_ROTATION_DIRECTION {
+        NONE = 0,
+        CLOCKWISE = 1,
+        DEGREES_180 = 2,
+        COUNTER_CLOCKWISE = 3
+    };
 
-        bitmap.forEach(function (i) {
-            formattedBitmap.push(rotate(i));
-            //Since the 8x8 Matrix chip can render on an 16x8 screen we have to write an empty byte
-            formattedBitmap.push(0);
-        });
+    export class HT16K33 {
+        public matrixAddress: number;
 
-        return formattedBitmap;
-    }
+        constructor() {
+            this.matrixAddress = HT16K33_CONSTANTS.DEFAULT_ADDRESS;
+        }
 
-    function initializeDisplay() {
-        /** 
-         * Required to initialize I2C 
-         * Issue: https://github.com/lancaster-university/codal-samd/issues/13
-         **/
-        pins.P20.setPull(PinPullMode.PullNone)
-        pins.P19.setPull(PinPullMode.PullNone)
-        
-        sendCommand(HT16K33_COMMANDS.TURN_OSCILLATOR_ON)
-        sendCommand(HT16K33_COMMANDS.TURN_DISPLAY_ON)
-        setBrightness(15);
-    }
+        //private static sendCommand(command: HT16K33_COMMANDS): void {
+        //    pins.i2cWriteNumber(this.matrixAddress, 0, NumberFormat.Int8LE, false);
+        //    pins.i2cWriteNumber(this.matrixAddress, command, NumberFormat.Int8LE, false);
+        //}
 
+        public sendCommand(command: HT16K33_COMMANDS): void {
+            pins.i2cWriteNumber(this.matrixAddress, 0, NumberFormat.Int8LE, false);
+            pins.i2cWriteNumber(this.matrixAddress, command, NumberFormat.Int8LE, false);
+        }
 
+        private rotateMatrix(matrix: number[], rotationDirection: HT16K33_ROTATION_DIRECTION): number[] {
+            const rows = matrix.length;
+            const cols = 1; // For a one-dimensional array
+            const rotatedMatrix: number[] = [];
 
-    //% blockId="HT16K33_SET_ADDRESS" block="set address %address"
-    export function setAddress(address: HT16K33_I2C_ADDRESSES) {
-        if (matrixAddress != address) {
-            matrixAddress = address;
-            initializeDisplay();
+            for (let col = 0; col < cols; col++) {
+                for (let row = 0; row < rows; row++) {
+                    const index = row * cols + col;
+                    switch (rotationDirection) {
+                        case HT16K33_ROTATION_DIRECTION.CLOCKWISE:
+                            rotatedMatrix[index] = matrix[(rows - row - 1) * cols + col];
+                            break;
+                        case HT16K33_ROTATION_DIRECTION.COUNTER_CLOCKWISE:
+                            rotatedMatrix[index] = matrix[row * cols + (cols - col - 1)];
+                            break;
+                        case HT16K33_ROTATION_DIRECTION.DEGREES_180:
+                            rotatedMatrix[index] = matrix[(rows - row - 1) * cols + (cols - col - 1)];
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+            return rotatedMatrix;
+        }
+
+        private offsetDisplay(value: number): number {
+            return (value >> 1) | (value << 7);
+        }
+
+        private formatBitmap(bitmap: number[]): number[] {
+            const formattedBitmap: number[] = [0];
+
+            bitmap.forEach(i => {
+                formattedBitmap.push(this.offsetDisplay(i));
+                // Since the 8x8 Matrix chip can render on a 16x8 screen, we have to write an empty byte
+                formattedBitmap.push(0);
+            });
+
+            return formattedBitmap;
+        }
+
+        //% blockId="HT16K33_RENDER_BITMAP" block="render bitmap %bitmap"
+        public render(bitmap: number[]): void {
+            const formattedBitmap = this.formatBitmap(this.rotateMatrix(bitmap, HT16K33_ROTATION_DIRECTION.DEGREES_180));
+            const buff = pins.createBufferFromArray(formattedBitmap);
+            pins.i2cWriteBuffer(this.matrixAddress, buff, false);
+        }
+
+        private initializeDisplay(): void {
+            /** 
+             * Required to initialize I2C 
+             * Issue: https://github.com/lancaster-university/codal-samd/issues/13
+             **/
+            pins.P20.setPull(PinPullMode.PullNone)
+            pins.P19.setPull(PinPullMode.PullNone)
+
+            this.sendCommand(HT16K33_COMMANDS.TURN_OSCILLATOR_ON);
+            this.sendCommand(HT16K33_COMMANDS.TURN_DISPLAY_ON);
+            this.setBrightness(HT16K33_CONSTANTS.MAX_BRIGHTNESS);
+        }
+
+        //% blockId="HT16K33_SET_ADDRESS" block="set address %address"
+        public setAddress(address: number): void {
+            this.matrixAddress = address;
+            this.initializeDisplay();
+        }
+
+        //% blockId="HT16K33_SET_BRIGHTNESS" block="set brightness %brightness"
+        //% brightness.min=0 brightness.max=15
+        public setBrightness(brightness: number): void {
+            this.sendCommand(HT16K33_COMMANDS.SET_BRIGHTNESS | (brightness & HT16K33_CONSTANTS.MAX_BRIGHTNESS));
+        }
+
+        //% blockId="HT16K33_SET_BLINK_RATE" block="set blink rate %rate"
+        //% rate.min=0 rate.max=3
+        public setBlinkRate(rate: number): void {
+            this.sendCommand(HT16K33_COMMANDS.TURN_DISPLAY_ON | ((rate & HT16K33_CONSTANTS.MAX_BLINK_RATE) << 1));
         }
     }
 
-    //% blockId="HT16K33_SET_BRIGHTNESS" block="set brightness %brightness"
-    //% brightness.min=0 brightness.max=15
-    export function setBrightness(brightness: number) {
-        sendCommand(HT16K33_COMMANDS.SET_BRIGHTNESS | brightness & HT16K33_CONSTANTS.MAX_BRIGHTNESS);
+    /**
+     * Create a HT16K33 object.
+     */
+    //% blockId="HT16K33_create" block="Create Dot Matrix Display"
+    //% subcategory="dotmatrix_ht16k33"
+    export function create(): HT16K33 {
+        return new HT16K33();
     }
-
-    //% blockId="HT16K33_SET_BLINK_RATE" block="set blink rate %rate"
-    //% rate.min=0 rate.max=3
-    export function setBlinkRate(rate: number) {
-        sendCommand(HT16K33_COMMANDS.TURN_DISPLAY_ON | (rate & HT16K33_CONSTANTS.MAX_BLINK_RATE) << 1);
-    }
-
 }
