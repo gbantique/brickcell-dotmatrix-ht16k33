@@ -1,29 +1,10 @@
-let ht16k33 = Brickcell.create(0)
-let smile = [
-60,
-66,
-165,
-129,
-165,
-153,
-66,
-60
-]
-let frown = [
-60,
-66,
-165,
-129,
-153,
-165,
-66,
-60
-]
+let ht16k33 = Brickcell.create(0x70)
+ht16k33.setup(2)
+ht16k33.setBrightness(3)
+ht16k33.renderMessage("abcd")
+// ht16k33.renderChar('a');
+basic.pause(3000);
 basic.forever(function () {
-    ht16k33.setBrightness(15)
-    ht16k33.render(smile)
-    basic.pause(1000)
-    ht16k33.setBrightness(3)
-    ht16k33.render(frown)
-    basic.pause(1000)
+	//ht16k33.renderFonts();
+    //basic.pause(300)
 })
