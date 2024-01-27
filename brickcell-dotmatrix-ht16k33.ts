@@ -286,7 +286,7 @@ namespace Brickcell {
             *   matrix1_row8, matrix2_row8
             *   ]
             **/
-            const formattedBitmap: number[] = [0];
+            let formattedBitmap: number[] = [0];
             for (let i = 0; i < 8; i++) {
                 formattedBitmap.push(this.offsetDisplay(matrix1[i]));
                 formattedBitmap.push(this.offsetDisplay(matrix2[i]));
@@ -328,17 +328,16 @@ namespace Brickcell {
         //% block="%ht16k33 render bitmap %bitmap"
         //% subcategory="dotmatrix_ht16k33"
         public render(bitmap: number[]): void {
-            let rotatedBitmap1: number[];
-            let rotatedBitmap2: number[];
-
             // for 2 dot matrix (16x8), mirror horizontal
             // for 1 dot matrix  (8x8), mirror vertical
             //      then rotate counter clockwise
+            let mirrorBitmap: number[];
+            let rotateBitmap: number[];
             if (this.numOfMatrix == 2)
-                rotatedBitmap1 = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_HORIZONTAL);
+                mirrorBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_HORIZONTAL);
             else
-                rotatedBitmap1 = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_VERTICAL);
-            rotatedBitmap2 = this.rotateMatrix(rotatedBitmap1, HT16K33_ROTATION.COUNTER_CLOCKWISE);
+                mirrorBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_VERTICAL);
+            rotateBitmap = this.rotateMatrix(mirrorBitmap, HT16K33_ROTATION.COUNTER_CLOCKWISE);
 
             let smile = [
                 0b00000001,
@@ -351,7 +350,7 @@ namespace Brickcell {
                 0b11000000
             ]
             
-            const formattedBitmap = this.formatBitmap(rotatedBitmap2, smile);
+            const formattedBitmap = this.formatBitmap(mirrorBitmap, smile);
             const buff = pins.createBufferFromArray(formattedBitmap);
             pins.i2cWriteBuffer(this.matrixAddress, buff, false);
         }
@@ -366,8 +365,8 @@ namespace Brickcell {
             }
 
             // pad 0 
-            for (let k = charBitmap.length; k < 8; k++)
-                bitmap[k] = 0;
+            //for (let k = charBitmap.length; k < 8; k++)
+            //    bitmap[k] = 0;
 
             // for 2 dot matrix (16x8), mirror horizontal
             // for 1 dot matrix  (8x8), mirror vertical
@@ -380,7 +379,7 @@ namespace Brickcell {
                 mirroredBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_VERTICAL);
             rotatedBitmap = this.rotateMatrix(mirroredBitmap, HT16K33_ROTATION.COUNTER_CLOCKWISE);
             
-            
+            /*
             let offsetBitmap: number[] = [];
             let byte: number = 0;
             for (let i = 0; i < rotatedBitmap.length; i++) {
@@ -388,9 +387,9 @@ namespace Brickcell {
                 if (this.numOfMatrix == 1)
                     offsetBitmap[i] = (byte >> 1) | (byte << 7);
                 offsetBitmap[i] =  byte;
-            }
+            }*/
 
-            return offsetBitmap;
+            return rotatedBitmap;
         }
 
         private decimalToBinary(decimalValue: number, significantBits: number): string {
@@ -414,26 +413,20 @@ namespace Brickcell {
         public renderMessage(message: string): void {
             // get font matrix:
             let fontMatrix: number[][] = [];
-            for (let i=0; i<message.length;i++) {
-                fontMatrix[i] = this.getFontMatrix(message[i]);
-            }
+            //for (let i=0; i<message.length;i++) {
+            //    fontMatrix[i] = this.getFontMatrix(message[i]);
+           /// }
+
+            fontMatrix[0] = this.getFontMatrix("w");
+            fontMatrix[1] = this.getFontMatrix("x");
+            fontMatrix[2] = this.getFontMatrix("y");
+            fontMatrix[3] = this.getFontMatrix("z");
 
 
-            let smile = [
-                0b00000001,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b11000000
-            ]
-
-            let mirroredSmile = this.rotateMatrix(smile, HT16K33_ROTATION.MIRROR_HORIZONTAL);
+            let outputText: string[] = [];
 
             // Displaying the text
-            let outputText = [];
+            console.log("Combined:");
             for (let row = 0; row < 8; row++) {
                 let rowOutput = '';
 
@@ -441,36 +434,60 @@ namespace Brickcell {
                     const byteValue = fontMatrix[col][row];
                     const binaryRepresentation = this.decimalToBinary(byteValue, 8);
                     const significantBits = binaryRepresentation.slice(3); // Slicing from index 3 to the end
-                    rowOutput += significantBits + '0';  // '0' add space between font
+                    rowOutput += significantBits + '0';  // Keep the '0' here
                 }
+
+                // Push each row into the outputText array
                 outputText.push(rowOutput);
+
+                //console.log(rowOutput);
             }
 
+            //console.log();
+
             // Chunking the outputText into an array of numbers with 8 bytes each
-            const chunkedOutputText = [];
+            console.log("Chunked:");
+            const chunkedOutputText: number[][] = [];
             for (let i = 0; i < outputText[0].length; i += 8) {
                 const chunk = outputText.map(row => parseInt(row.slice(i, i + 8), 2));
                 chunkedOutputText.push(chunk);
             }
 
-            // Final
-            let chunkText2 = [];
-            for (let col = 0; col < chunkedOutputText.length; col++) {
-                let rowBinary = [];
-                for (let row = 0; row < 8; row++) {
+            // Displaying the chunkedOutputText
+            let chunkText: number[][] = [];
+            for (let row = 0; row < 8; row++) {
+                let rowOutput = '';
+                let rowBinary: number[] = [];
+
+                for (let col = 0; col < chunkedOutputText.length; col++) {
                     const byteValue = chunkedOutputText[col][row];
                     const binaryRepresentation = this.decimalToBinary(byteValue, 8);
+                    rowOutput += binaryRepresentation + ' ';
                     rowBinary.push(byteValue);
                 }
 
-                chunkText2.push(rowBinary);
+                //console.log(rowOutput);
+                chunkText.push(rowBinary);
             }
 
+            //console.log();
+
+            //console.log("Final:");
+
+            // Transpose the matrix
+            const transposedChunkText = chunkText[0].map((_, col) => chunkText.map(row => row[col]));
+
+            //for (let x = 0; x < transposedChunkText.length; x++) {
+            //    console.log(transposedChunkText[x]);
+            //}
 
 
-            const formattedBitmap = this.formatBitmap(chunkText2[0], chunkText2[1]);
+            this.clearDisplay();
+
+            const formattedBitmap = this.formatBitmap(transposedChunkText[0], transposedChunkText[1]);
             const buff = pins.createBufferFromArray(formattedBitmap);
             pins.i2cWriteBuffer(this.matrixAddress, buff, false);
+
         }
 
 
