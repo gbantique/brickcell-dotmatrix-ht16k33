@@ -40,17 +40,6 @@ namespace Brickcell {
         private matrixAddress: number;
         private numOfMatrix: number;
 
-        private smile: number[] = [
-            60,
-            66,
-            165,
-            129,
-            165,
-            153,
-            66,
-            60
-        ]
-
         private font: string[] = [" ", "!", "\"", "#", "$", "%", "&", "\'", "(", ")",
             "*", "+", ",", "-", ".", "/",
             "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
@@ -254,7 +243,6 @@ namespace Brickcell {
          * Modify matrix according to given rotation direction
          **/
         private rotateMatrix(matrix: number[], rotationDirection: HT16K33_ROTATION): number[] {
-            let modifiedMatrix = [];
             if (rotationDirection == HT16K33_ROTATION.CLOCKWISE)
                 return this.rotateMatrixClockwise(matrix);
             if (rotationDirection == HT16K33_ROTATION.COUNTER_CLOCKWISE)
@@ -300,7 +288,7 @@ namespace Brickcell {
         */
         //% block="%ht16k33 Setup MAX7219:|Number of matrix $num"
         //% blockId="HT16K33_setup"
-        //% num.min=1 num.defl=1
+        //% num.min=1 num.max=2 num.defl=1
         //% subcategory="dotmatrix_ht16k33"
         public setup(num: number) {
             this.numOfMatrix = num;
@@ -430,168 +418,46 @@ namespace Brickcell {
         //% block="%ht16k33 render message %message"
         //% subcategory="dotmatrix_ht16k33"
         public renderMessage(message: string): void {
-            // get font matrix:
             let fontMatrix: number[][] = [];
             
-            //for (let i=0; i<message.length;i++) {
-            //    fontMatrix[i] = this.getFontMatrix(message[i]);
-            //}
-
-            fontMatrix[0] = this.getFontMatrix("a");
-            fontMatrix[1] = this.getFontMatrix("b");
-            fontMatrix[2] = this.getFontMatrix("c");
-            fontMatrix[3] = this.getFontMatrix("d");
-
-
-            const font = [
-                // Letter A
-                [
-                    0b00000100,
-                    0b00001010,
-                    0b00010001,
-                    0b00011111,
-                    0b00010001,
-                    0b00010001,
-                    0b00010001,
-                    0b00000000,
-                ],
-
-                // Letter B
-                [
-                    0b00011110,
-                    0b00010001,
-                    0b00010001,
-                    0b00011110,
-                    0b00010001,
-                    0b00010001,
-                    0b00011110,
-                    0b00000000,
-                ],
-
-                // Letter C
-                [
-                    0b00001110,
-                    0b00010001,
-                    0b00010000,
-                    0b00010000,
-                    0b00010000,
-                    0b00010001,
-                    0b00001110,
-                    0b00000000,
-                ],
-
-                // Letter D
-                [
-                    0b00011110,
-                    0b00010001,
-                    0b00010001,
-                    0b00010001,
-                    0b00010001,
-                    0b00010001,
-                    0b00011110,
-                    0b00000000,
-                ],
-            ];
-
-            //fontMatrix = [
-            //    this.fixFontMatrix(font[0]), // Letter A
-            //    this.fixFontMatrix(font[1]), // Letter B
-            //    this.fixFontMatrix(font[2]), // Letter C
-            //    this.fixFontMatrix(font[3]), // Letter D
-            //];
-
-            //fontMatrix = [
-            //    font[0],
-            //    font[1],
-            //    font[2],
-            //    font[3]
-            //];
+            for (let i=0; i<message.length;i++) {
+                fontMatrix[i] = this.getFontMatrix(message[i]);
+            }
 
             let outputText: string[] = [];
-
-            // Displaying the text
-            console.log("Combined:");
             for (let row = 0; row < 8; row++) {
                 let rowOutput = '';
-
                 for (let col = 0; col < fontMatrix.length; col++) {
                     const byteValue = fontMatrix[col][row];
                     const binaryRepresentation = this.decimalToBinary(byteValue, 8);
                     const significantBits = binaryRepresentation.slice(3); // Slicing from index 3 to the end
-                    rowOutput += significantBits + '0';  // Keep the '0' here
+                    rowOutput += significantBits + '0';  // Add '0' for space
                 }
-
-                // Push each row into the outputText array
                 outputText.push(rowOutput);
-
-                //console.log(rowOutput);
             }
 
-            //console.log();
-
-            // Chunking the outputText into an array of numbers with 8 bytes each
-            console.log("Chunked:");
             const chunkedOutputText: number[][] = [];
             for (let i = 0; i < outputText[0].length; i += 8) {
                 const chunk = outputText.map(row => parseInt(row.slice(i, i + 8), 2));
                 chunkedOutputText.push(chunk);
             }
-
-            // Displaying the chunkedOutputText
+            
             let chunkText: number[][] = [];
             for (let row = 0; row < 8; row++) {
                 let rowOutput = '';
                 let rowBinary: number[] = [];
-
                 for (let col = 0; col < chunkedOutputText.length; col++) {
                     const byteValue = chunkedOutputText[col][row];
                     const binaryRepresentation = this.decimalToBinary(byteValue, 8);
                     rowOutput += binaryRepresentation + ' ';
                     rowBinary.push(byteValue);
                 }
-
-                //console.log(rowOutput);
                 chunkText.push(rowBinary);
             }
-
-            //console.log();
-
-            //console.log("Final:");
-
-            // Transpose the matrix
             const transposedChunkText = chunkText[0].map((_, col) => chunkText.map(row => row[col]));
-
-            //for (let x = 0; x < transposedChunkText.length; x++) {
-            //    console.log(transposedChunkText[x]);
-            //}
-
-
             this.clearDisplay();
 
-            let smile = [
-                0b00000001,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b11000000
-            ];
-
-            let frown = [
-                0b11100000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000
-            ]
-
-            //const formattedBitmap = this.formatBitmap(transposedChunkText[0], transposedChunkText[1]);
-            const formattedBitmap = this.formatBitmap(smile, frown);
+            const formattedBitmap = this.formatBitmap(transposedChunkText[0], transposedChunkText[1]);
             const buff = pins.createBufferFromArray(formattedBitmap);
             pins.i2cWriteBuffer(this.matrixAddress, buff, false);
 
