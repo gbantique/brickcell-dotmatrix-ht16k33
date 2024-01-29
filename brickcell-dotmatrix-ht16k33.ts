@@ -51,7 +51,6 @@ namespace Brickcell {
             60
         ]
 
-        // ASCII fonts borrowed from https://github.com/lyle/matrix-led-font/blob/master/src/index.js
         private font: string[] = [" ", "!", "\"", "#", "$", "%", "&", "\'", "(", ")",
             "*", "+", ",", "-", ".", "/",
             "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
@@ -160,19 +159,21 @@ namespace Brickcell {
             [0b00001000, 0b00000100, 0b00001000, 0b00000100, 0b00000000],
             [0b00000010, 0b00000001, 0b00000010, 0b00000000]];
 
-
-
+        /**
+         * HT16K33 Class constructor
+         **/
         constructor() {
             this.matrixAddress = HT16K33_CONSTANTS.DEFAULT_ADDRESS;
             this.numOfMatrix = 1;
         }
 
+        /**
+         * Send command to OLED display
+         **/
         private sendCommand(command: HT16K33_COMMANDS): void {
             pins.i2cWriteNumber(this.matrixAddress, 0, NumberFormat.Int8LE, false);
             pins.i2cWriteNumber(this.matrixAddress, command, NumberFormat.Int8LE, false);
         }
-
-
 
         /**
          * Rotate matrix clockwise
@@ -356,6 +357,24 @@ namespace Brickcell {
         }
 
 
+        public fixFontMatrix(bitmap: number[]): number[] {
+            // pad 0 
+            //for (let k = charBitmap.length; k < 8; k++)
+            //    bitmap[k] = 0;
+
+            // for 2 dot matrix (16x8), mirror horizontal
+            // for 1 dot matrix  (8x8), mirror vertical
+            //      then rotate counter clockwise
+            let mirroredBitmap: number[];
+            let rotatedBitmap: number[];
+            if (this.numOfMatrix == 2)
+                mirroredBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_HORIZONTAL);
+            else
+                mirroredBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_VERTICAL);
+            rotatedBitmap = this.rotateMatrix(mirroredBitmap, HT16K33_ROTATION.COUNTER_CLOCKWISE);
+            return mirroredBitmap;
+        }
+
         public getFontMatrix(char: string): number[] {
             let bitmap: number[] = [];
             const charIndex = this.font.indexOf(char);
@@ -413,15 +432,80 @@ namespace Brickcell {
         public renderMessage(message: string): void {
             // get font matrix:
             let fontMatrix: number[][] = [];
+            
             //for (let i=0; i<message.length;i++) {
             //    fontMatrix[i] = this.getFontMatrix(message[i]);
-           /// }
+            //}
 
-            fontMatrix[0] = this.getFontMatrix("w");
-            fontMatrix[1] = this.getFontMatrix("x");
-            fontMatrix[2] = this.getFontMatrix("y");
-            fontMatrix[3] = this.getFontMatrix("z");
+            fontMatrix[0] = this.getFontMatrix("a");
+            fontMatrix[1] = this.getFontMatrix("b");
+            fontMatrix[2] = this.getFontMatrix("c");
+            fontMatrix[3] = this.getFontMatrix("d");
 
+
+            const font = [
+                // Letter A
+                [
+                    0b00000100,
+                    0b00001010,
+                    0b00010001,
+                    0b00011111,
+                    0b00010001,
+                    0b00010001,
+                    0b00010001,
+                    0b00000000,
+                ],
+
+                // Letter B
+                [
+                    0b00011110,
+                    0b00010001,
+                    0b00010001,
+                    0b00011110,
+                    0b00010001,
+                    0b00010001,
+                    0b00011110,
+                    0b00000000,
+                ],
+
+                // Letter C
+                [
+                    0b00001110,
+                    0b00010001,
+                    0b00010000,
+                    0b00010000,
+                    0b00010000,
+                    0b00010001,
+                    0b00001110,
+                    0b00000000,
+                ],
+
+                // Letter D
+                [
+                    0b00011110,
+                    0b00010001,
+                    0b00010001,
+                    0b00010001,
+                    0b00010001,
+                    0b00010001,
+                    0b00011110,
+                    0b00000000,
+                ],
+            ];
+
+            //fontMatrix = [
+            //    this.fixFontMatrix(font[0]), // Letter A
+            //    this.fixFontMatrix(font[1]), // Letter B
+            //    this.fixFontMatrix(font[2]), // Letter C
+            //    this.fixFontMatrix(font[3]), // Letter D
+            //];
+
+            //fontMatrix = [
+            //    font[0],
+            //    font[1],
+            //    font[2],
+            //    font[3]
+            //];
 
             let outputText: string[] = [];
 
@@ -484,7 +568,30 @@ namespace Brickcell {
 
             this.clearDisplay();
 
-            const formattedBitmap = this.formatBitmap(transposedChunkText[0], transposedChunkText[1]);
+            let smile = [
+                0b00000001,
+                0b00000000,
+                0b00000000,
+                0b00000000,
+                0b00000000,
+                0b00000000,
+                0b00000000,
+                0b11000000
+            ];
+
+            let frown = [
+                0b11100000,
+                0b00000000,
+                0b00000000,
+                0b00000000,
+                0b00000000,
+                0b00000000,
+                0b00000000,
+                0b00000000
+            ]
+
+            //const formattedBitmap = this.formatBitmap(transposedChunkText[0], transposedChunkText[1]);
+            const formattedBitmap = this.formatBitmap(smile, frown);
             const buff = pins.createBufferFromArray(formattedBitmap);
             pins.i2cWriteBuffer(this.matrixAddress, buff, false);
 
