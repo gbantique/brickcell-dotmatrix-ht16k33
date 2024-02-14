@@ -275,11 +275,15 @@ namespace Brickcell {
             *   matrix1_row8, matrix2_row8
             *   ]
             **/
+
             let formattedBitmap: number[] = [0];
-            for (let i = 0; i < 8; i++) {
-                formattedBitmap.push(this.offsetDisplay(matrix1[i]));
-                formattedBitmap.push(this.offsetDisplay(matrix2[i]));
-            }
+
+
+                for (let row = 0; row < 8; row++) {
+                    formattedBitmap.push(this.offsetDisplay(matrix2[row]));
+                    formattedBitmap.push(this.offsetDisplay(matrix1[row]));
+                }
+
             return formattedBitmap;
         }
 
@@ -312,57 +316,6 @@ namespace Brickcell {
 
         // --------------------------- V I S U A L --------------------------------------------
 
-
-        //% blockId="HT16K33_render"
-        //% block="%ht16k33 render bitmap %bitmap"
-        //% subcategory="dotmatrix_ht16k33"
-        public render(bitmap: number[]): void {
-            // for 2 dot matrix (16x8), mirror horizontal
-            // for 1 dot matrix  (8x8), mirror vertical
-            //      then rotate counter clockwise
-            let mirrorBitmap: number[];
-            let rotateBitmap: number[];
-            if (this.numOfMatrix == 2)
-                mirrorBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_HORIZONTAL);
-            else
-                mirrorBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_VERTICAL);
-            rotateBitmap = this.rotateMatrix(mirrorBitmap, HT16K33_ROTATION.COUNTER_CLOCKWISE);
-
-            let smile = [
-                0b00000001,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b00000000,
-                0b11000000
-            ]
-            
-            const formattedBitmap = this.formatBitmap(mirrorBitmap, smile);
-            const buff = pins.createBufferFromArray(formattedBitmap);
-            pins.i2cWriteBuffer(this.matrixAddress, buff, false);
-        }
-
-
-        public fixFontMatrix(bitmap: number[]): number[] {
-            // pad 0 
-            //for (let k = charBitmap.length; k < 8; k++)
-            //    bitmap[k] = 0;
-
-            // for 2 dot matrix (16x8), mirror horizontal
-            // for 1 dot matrix  (8x8), mirror vertical
-            //      then rotate counter clockwise
-            let mirroredBitmap: number[];
-            let rotatedBitmap: number[];
-            if (this.numOfMatrix == 2)
-                mirroredBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_HORIZONTAL);
-            else
-                mirroredBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_VERTICAL);
-            rotatedBitmap = this.rotateMatrix(mirroredBitmap, HT16K33_ROTATION.COUNTER_CLOCKWISE);
-            return mirroredBitmap;
-        }
-
         public getFontMatrix(char: string): number[] {
             let bitmap: number[] = [];
             const charIndex = this.font.indexOf(char);
@@ -378,23 +331,13 @@ namespace Brickcell {
             // for 2 dot matrix (16x8), mirror horizontal
             // for 1 dot matrix  (8x8), mirror vertical
             //      then rotate counter clockwise
-            let mirroredBitmap: number[];
+            let mirroredBitmap: number[] = [];
             let rotatedBitmap: number[];
-            if (this.numOfMatrix == 2)
+            if (this.numOfMatrix === 2)
                 mirroredBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_HORIZONTAL);
             else
                 mirroredBitmap = this.rotateMatrix(bitmap, HT16K33_ROTATION.MIRROR_VERTICAL);
             rotatedBitmap = this.rotateMatrix(mirroredBitmap, HT16K33_ROTATION.COUNTER_CLOCKWISE);
-            
-            /*
-            let offsetBitmap: number[] = [];
-            let byte: number = 0;
-            for (let i = 0; i < rotatedBitmap.length; i++) {
-                byte = rotatedBitmap[i];
-                if (this.numOfMatrix == 1)
-                    offsetBitmap[i] = (byte >> 1) | (byte << 7);
-                offsetBitmap[i] =  byte;
-            }*/
 
             return rotatedBitmap;
         }
@@ -410,6 +353,17 @@ namespace Brickcell {
             return binaryString;
         }
 
+        private reverseString(str: string): string {
+            const arr = str.split('');
+            let reversed = '';
+            for (let i = arr.length - 1; i >= 0; i--) {
+                reversed += arr[i];
+            }
+            return reversed;
+        }
+
+        // *********************************************************************************************
+
         /**
          * Render a message on the Dot Matrix Display.
          * @param message The message to display
@@ -418,9 +372,11 @@ namespace Brickcell {
         //% block="%ht16k33 render message %message"
         //% subcategory="dotmatrix_ht16k33"
         public renderMessage(message: string): void {
+
+            //let strReverse: string = this.reverseString(message);
             let fontMatrix: number[][] = [];
-            
-            for (let i=0; i<message.length;i++) {
+
+            for (let i = 0; i < message.length; i++) {
                 fontMatrix[i] = this.getFontMatrix(message[i]);
             }
 
@@ -429,102 +385,49 @@ namespace Brickcell {
                 let rowOutput = '';
                 for (let col = 0; col < fontMatrix.length; col++) {
                     const byteValue = fontMatrix[col][row];
-                    const binaryRepresentation = this.decimalToBinary(byteValue, 8);
-                    const significantBits = binaryRepresentation.slice(3); // Slicing from index 3 to the end
-                    rowOutput += significantBits + '0';  // Add '0' for space
+                    const binaryRepresentation = this.decimalToBinary(byteValue, 8).slice(4);
+                    rowOutput += binaryRepresentation;
                 }
                 outputText.push(rowOutput);
+                serial.writeLine(rowOutput);
             }
 
+            // Chunk the output text into 8-bit chunks
             const chunkedOutputText: number[][] = [];
             for (let i = 0; i < outputText[0].length; i += 8) {
                 const chunk = outputText.map(row => parseInt(row.slice(i, i + 8), 2));
                 chunkedOutputText.push(chunk);
             }
-            
+
             let chunkText: number[][] = [];
             for (let row = 0; row < 8; row++) {
                 let rowOutput = '';
                 let rowBinary: number[] = [];
                 for (let col = 0; col < chunkedOutputText.length; col++) {
                     const byteValue = chunkedOutputText[col][row];
-                    const binaryRepresentation = this.decimalToBinary(byteValue, 8);
-                    rowOutput += binaryRepresentation + ' ';
                     rowBinary.push(byteValue);
                 }
                 chunkText.push(rowBinary);
             }
+
+            // Transpose the chunkText array
             const transposedChunkText = chunkText[0].map((_, col) => chunkText.map(row => row[col]));
-            this.clearDisplay();
 
-            const formattedBitmap = this.formatBitmap(transposedChunkText[0], transposedChunkText[1]);
+            // Clear the display
+
+            // Format the transposedChunkText and create a buffer
+            let formattedBitmap: number[] = [];
+            if (transposedChunkText.length === 1 )
+                formattedBitmap = this.formatBitmap(transposedChunkText[0], []);
+            else
+                formattedBitmap = this.formatBitmap(transposedChunkText[0], transposedChunkText[1]);
             const buff = pins.createBufferFromArray(formattedBitmap);
+
+            // Write the buffer to the I2C device with the specified matrix address
             pins.i2cWriteBuffer(this.matrixAddress, buff, false);
-
         }
 
 
-        /**
-         * Render a message on the Dot Matrix Display.
-         * @param message The message to display
-         * @param addr I2C address of the HT16K33 chip
-         */
-        //% blockId="HT16K33_renderChar"
-        //% block="%ht16k33 render character %char"
-        //% subcategory="dotmatrix_ht16k33"
-        public renderChar(char: string): void {
-            let bitmap: number[] = [];
-            const charIndex = this.font.indexOf(char);
-            const charBitmap = this.font_matrix[charIndex];
-            for (let j = 0; j < charBitmap.length; j++) {
-                bitmap[j] = charBitmap[j];
-            }
-
-            // Render the bitmap on the display
-            this.clearDisplay();
-            this.render(bitmap);
-        }
-    
-
-        /**
-         * Scroll text on the Dot Matrix Display.
-         * @param text The text to scroll
-         * @param delay Time delay between each scroll step in milliseconds
-         */
-        //% blockId="HT16K33_scrollText"
-        //% block="%ht16k33 scroll text %text with delay %delay"
-        //% subcategory="dotmatrix_ht16k33"
-        public scrollText(text: string, delay: number): void {
-            const scrollSteps = text.length + 8; // Adding extra steps for empty spaces between scrolls
-
-            for (let step = 0; step < scrollSteps; step++) {
-                let displayText = "        " + text + "        "; // Add empty spaces for scrolling effect
-                displayText = displayText.substr(step, 8); // Extract the current 8-character segment
-                this.renderMessage(displayText);
-                basic.pause(delay);
-            }
-        }
-
-
-        /**
-         * Render all fonts on the Dot Matrix Display.
-         */
-        //% blockId="HT16K33_renderFonts"
-        //% block="%ht16k33 render all fonts"
-        //% subcategory="dotmatrix_ht16k33"
-        public renderFonts(): void {
-            let bitmap: number[] = [];
-            
-            for (let i = 0; i < this.font_matrix.length; i++) {
-                for (let j = 0; j < this.font_matrix[i].length; j++) {
-                    bitmap[j] = this.font_matrix[i][j];
-                }
-                // Render the bitmap on the display
-                this.clearDisplay();
-                this.render(bitmap);
-                basic.pause(500);
-            }
-        }
 
 
         //% blockId="HT16K33_setBrightness"
@@ -547,7 +450,10 @@ namespace Brickcell {
         //% block="%ht16k33 clear display"
         //% subcategory="dotmatrix_ht16k33"
         public clearDisplay(): void {
-            this.render([0, 0, 0, 0, 0, 0, 0, 0]);
+            const blankBitmap: number[] = [];
+            let formattedBitmap = this.formatBitmap(blankBitmap, blankBitmap);
+            let buff = pins.createBufferFromArray(formattedBitmap);
+            pins.i2cWriteBuffer(this.matrixAddress, buff, false);
         }
 
     }
